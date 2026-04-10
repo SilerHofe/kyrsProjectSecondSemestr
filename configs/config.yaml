@@ -1,0 +1,89 @@
+# configs/config.yaml
+# Главный конфигурационный файл проекта
+# Все пути и гиперпараметры в одном месте
+
+project:
+  name: "portrait_lora"
+  seed: 42
+
+# ── Пути ──────────────────────────────────────────────────────────────────────
+paths:
+  # Сырые данные после скачивания
+  celeba_images:    "data/raw/img_align_celeba"
+  celeba_hq_images: "data/raw/celeba_hq_256"
+  attr_file:        "data/raw/list_attr_celeba.txt"
+  partition_file:   "data/raw/list_eval_partition.txt"
+
+  # Обработанные данные
+  processed_dir:    "data/processed"
+  prompts_json:     "data/processed/celeba_prompts.json"
+  train_manifest:   "data/processed/train.json"
+  val_manifest:     "data/processed/val.json"
+  test_manifest:    "data/processed/test.json"
+
+  # Обучение
+  lora_output:      "lora_output"
+  checkpoints:      "checkpoints"
+  logs:             "logs"
+  samples:          "samples"
+
+# ── Данные ────────────────────────────────────────────────────────────────────
+data:
+  image_size: 512
+  # Официальная разбивка CelebA:
+  #   0 = train (162770), 1 = val (19867), 2 = test (19962)
+  use_official_split: true
+  # Сколько изображений брать из train (None = все 162 770)
+  # Для быстрого старта поставьте 10000
+  max_train_samples: null
+  num_workers: 0
+
+# ── LoRA ──────────────────────────────────────────────────────────────────────
+lora:
+  base_model: "runwayml/stable-diffusion-v1-5"
+  rank: 8                    # r=4 быстрее, r=16 качественнее
+  alpha: 32                  # масштаб (обычно = 4×rank)
+  dropout: 0.1
+  # Какие модули дообучать
+  target_modules:
+    - "to_k"
+    - "to_q"
+    - "to_v"
+    - "to_out.0"
+
+# ── Обучение ──────────────────────────────────────────────────────────────────
+training:
+  num_train_epochs: 5
+  # Effective batch = train_batch_size × gradient_accumulation_steps
+  train_batch_size: 6        # на один GPU
+  gradient_accumulation_steps: 3   # effective = 18
+  learning_rate: 1.0e-4
+  lr_scheduler: "cosine"     # constant | cosine | linear
+  lr_warmup_steps: 500
+  mixed_precision: "bf16"    # no | fp16 | bf16
+  max_grad_norm: 1.0
+  # Сохранение
+  save_every_n_steps: 500
+  validation_every_n_steps: 500
+  num_validation_images: 4
+  # Логирование
+  use_wandb: false
+  report_to: "tensorboard"   # tensorboard | wandb | none
+
+# ── Инференс ──────────────────────────────────────────────────────────────────
+inference:
+  guidance_scale: 7.5
+  num_inference_steps: 50
+  image_size: 512
+  num_images_per_prompt: 1
+
+# ── CLIP ──────────────────────────────────────────────────────────────────────
+clip:
+  model_name: "openai/clip-vit-base-patch32"
+  max_token_length: 77
+
+# ── Оценка ────────────────────────────────────────────────────────────────────
+evaluation:
+  num_eval_images: 1000      # сколько генерировать для FID
+  batch_size: 8
+  fid_dims: 2048             # размерность Inception features
